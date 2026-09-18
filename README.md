@@ -181,25 +181,6 @@ refuses to inject into a ROM that already contains EnableGop).
 
 ---
 
-## Publishing this under your handle
-
-```bash
-git init
-git add .
-git commit -m "GopForge: guided EnableGop injection + validation for cMP"
-# set your identity for this repo if you keep commits under KurdtNervanna:
-#   git config user.name  "KurdtNervanna"
-#   git config user.email "<your KurdtNervanna email>"
-git branch -M main
-git remote add origin git@github.com:KurdtNervanna/GopForge.git
-git push -u origin main
-```
-
-`.gitignore` already excludes `*.rom`, `*.bin`, and `*.sha256` so you never
-accidentally commit a dump containing your machine's serial number.
-
----
-
 ## Credits
 
 - **EnableGop** — Mike Beaton, distributed with
