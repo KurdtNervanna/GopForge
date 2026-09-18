@@ -179,6 +179,17 @@ Both variants share the same FFS GUID, so GopForge validates either one. Start
 from a **clean, un-injected dump** each time you switch variants (the tool
 refuses to inject into a ROM that already contains EnableGop).
 
+> **"Signal comes on at the chime, but the screen stays black until OpenCore."**
+> This is **success, not failure** — EnableGop has brought the GPU's GOP up early
+> (the monitor now syncs at power-on). On a non-native GPU, a *silent* boot won't
+> necessarily draw the gray Apple logo, but the real UIs will: **hold ⌥ (Option)
+> at power-on and you should get the native boot picker** before OpenCore. Target
+> Disk Mode (**T**), the firmware-password prompt, and the macOS progress screen
+> also render. The ALT picker is the deliverable.
+>
+> *Confirmed working:* AMD **Vega 64** on a MacPro5,1 (4 MiB BootROM, 144.0.0.0.0)
+> with the **`--direct`** variant — native ⌥ boot picker on DisplayPort.
+
 ---
 
 ## Credits
