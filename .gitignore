@@ -1,0 +1,15 @@
+# Never commit ROM dumps — they contain your machine's serial / NVRAM.
+*.rom
+*.bin
+*.fd
+*.sha256
+
+# Injector / tools you download yourself
+tools/
+DXEInject
+EnableGop.ffs
+EnableGop.efi
+
+# OS cruft
+.DS_Store
+Thumbs.db

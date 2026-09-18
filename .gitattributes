@@ -1,0 +1,4 @@
+# Keep everything LF in the repo; gopforge.sh must stay LF or its shebang
+# and bash parsing break on macOS/Linux (the platforms it runs on).
+* text=auto eol=lf
+*.sh text eol=lf
