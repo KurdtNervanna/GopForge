@@ -18,11 +18,15 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 PROG="$(basename "$0")"
 
 # Default OpenCore release to pull EnableGop.ffs from (override with --oc-version).
 OC_VERSION="1.0.7"
+# Which EnableGop build to fetch/inject: "standard" (EnableGop_*.ffs) or
+# "direct" (EnableGopDirect_*.ffs). Both share the same FFS GUID; the Direct
+# variant is the one to use when the GPU needs DirectGopRendering (set by --direct).
+EG_VARIANT="standard"
 # Auto-fetch behaviour (set by flags in main()).
 NO_FETCH="no"
 # Default source for DXEInject (dosdude1). The host now serves this file over
@@ -79,6 +83,9 @@ ${C_BOLD}MODES${C_RESET}
 ${C_BOLD}OPTIONS${C_RESET}
   -o, --output <file>     Output ROM path (default: <dump>-enablegop.rom)
   -f, --ffs <file>        Path to EnableGop.ffs (auto-fetched if absent)
+      --direct            Use the EnableGopDirect variant (for GPUs needing
+                          DirectGopRendering; try this if the standard build
+                          gives no boot screen). Ignored if -f is given.
       --dxeinject <p>     Path to the DXEInject binary (default: PATH/$TOOLS_DIR)
       --dxeinject-url <u> HTTPS URL to auto-fetch DXEInject (sha256-pinned, TOFU)
       --oc-version <v>    OpenCore release to pull EnableGop.ffs from (def: $OC_VERSION)
@@ -187,19 +194,27 @@ fetch_enablegop_ffs() {
   mkdir -p "$(dirname "$dest")"
   local url="https://github.com/acidanthera/OpenCorePkg/releases/download/${ver}/OpenCore-${ver}-RELEASE.zip"
   local tmp; tmp="$(mktempd)"
-  info "fetching EnableGop.ffs from OpenCore ${ver}…"
+  info "fetching ${EG_VARIANT} EnableGop .ffs from OpenCore ${ver}…"
   info "$url"
   download "$url" "$tmp/oc.zip" || die "download failed: $url
      (check the version with --oc-version, or fetch EnableGop.ffs manually)"
-  # Pick the standard EnableGop .ffs (the file is versioned, e.g.
-  # Utilities/EnableGop/EnableGop_1.4.ffs). Exclude the "Direct" variant and
-  # the Pre-release/dev builds; if several versions exist, take the newest.
+  # The .ffs files are versioned, e.g. Utilities/EnableGop/EnableGop_1.4.ffs and
+  # EnableGopDirect_1.4.ffs. Pick the requested variant, exclude Pre-release/dev
+  # builds, and if several versions exist take the newest.
+  #   standard → EnableGop_<ver>.ffs   (NOT EnableGopDirect_)
+  #   direct   → EnableGopDirect_<ver>.ffs
+  local pat
+  if [ "$EG_VARIANT" = "direct" ]; then
+    pat='/EnableGopDirect_[0-9][^/]*\.ffs$'
+  else
+    pat='/EnableGop_[0-9][^/]*\.ffs$'
+  fi
   local member
   member="$(unzip -Z1 "$tmp/oc.zip" 2>/dev/null \
-              | grep -iE '/EnableGop_[0-9][^/]*\.ffs$' \
+              | grep -iE "$pat" \
               | grep -viE 'pre-release|dev' \
               | sort -V | tail -1 || true)"
-  [ -n "$member" ] || die "no EnableGop_*.ffs found inside OpenCore-${ver}-RELEASE.zip
+  [ -n "$member" ] || die "no ${EG_VARIANT} EnableGop .ffs found inside OpenCore-${ver}-RELEASE.zip
      (the release layout may have changed — extract EnableGop's .ffs manually)"
   info "selected $member"
   unzip -o -j "$tmp/oc.zip" "$member" -d "$(dirname "$dest")" >/dev/null \
@@ -208,7 +223,7 @@ fetch_enablegop_ffs() {
   got="$(dirname "$dest")/$(basename "$member")"
   [ "$got" != "$dest" ] && mv -f "$got" "$dest"
   [ -s "$dest" ] || die "fetched EnableGop.ffs is empty"
-  ok "EnableGop.ffs → $dest ($(file_size "$dest") bytes, from OpenCore $ver)"
+  ok "$(basename "$member") → $dest ($(file_size "$dest") bytes, from OpenCore $ver)"
 }
 
 # ----------------------------------------------------------------------------
@@ -268,12 +283,14 @@ do_check() {
   printf '  size    : %s (%s bytes)\n' "$(human "$size")" "$size"
   printf '  sha256  : %s\n' "$(sha256_of "$rom")"
 
-  # size sanity — cMP boot ROM dumps are typically 2 MiB. We only warn.
+  # size sanity — cMP boot ROM dumps are 2 MiB or 4 MiB depending on the SPI
+  # chip fitted (e.g. a 4 MiB SST25VF032B on some 5,1 boards). We only warn.
   case "$size" in
     2097152) printf '  layout  : %s2 MiB — typical cMP dump%s\n' "$C_GRN" "$C_RESET" ;;
-    1048576|4194304|8388608)
+    4194304) printf '  layout  : %s4 MiB — cMP dump (larger SPI chip, e.g. SST25VF032B)%s\n' "$C_GRN" "$C_RESET" ;;
+    1048576|8388608)
              printf '  layout  : %s%s — a power-of-two flash size%s\n' "$C_YEL" "$(human "$size")" "$C_RESET"
-             warn "not the usual 2 MiB cMP dump size — double-check this is the right file" ;;
+             warn "not a usual 2/4 MiB cMP dump size — double-check this is the right file" ;;
     *)       printf '  layout  : %s%s — unusual size%s\n' "$C_YEL" "$(human "$size")" "$C_RESET"
              warn "size is not a typical flash-chip size; is this really a full ROM dump?" ;;
   esac
@@ -325,10 +342,12 @@ do_inject() {
   # --- EnableGop.ffs (auto-fetch if missing) ------------------------------
   if [ ! -f "$ffs" ]; then
     if [ "$NO_FETCH" = "yes" ]; then
-      die "EnableGop.ffs not found: $ffs  (auto-fetch disabled with --no-fetch)"
+      die "EnableGop .ffs not found: $ffs  (auto-fetch disabled with --no-fetch)"
     fi
-    info "EnableGop.ffs not found locally — fetching it automatically"
-    ffs="$TOOLS_DIR/EnableGop.ffs"
+    local egname="EnableGop.ffs"
+    [ "$EG_VARIANT" = "direct" ] && egname="EnableGopDirect.ffs"
+    info "EnableGop .ffs not found locally — fetching the ${EG_VARIANT} variant"
+    ffs="$TOOLS_DIR/$egname"
     [ -f "$ffs" ] || fetch_enablegop_ffs "$OC_VERSION" "$ffs"
   fi
 
@@ -502,7 +521,11 @@ do_inject() {
 # ----------------------------------------------------------------------------
 do_fetch() {
   local ffs="$1" dxe_url="$2"
-  [ -n "$ffs" ] || ffs="$TOOLS_DIR/EnableGop.ffs"
+  if [ -z "$ffs" ]; then
+    local egname="EnableGop.ffs"
+    [ "$EG_VARIANT" = "direct" ] && egname="EnableGopDirect.ffs"
+    ffs="$TOOLS_DIR/$egname"
+  fi
   fetch_enablegop_ffs "$OC_VERSION" "$ffs"
   if [ -n "$dxe_url" ]; then
     fetch_dxeinject "$dxe_url" "$TOOLS_DIR/DXEInject"
@@ -536,6 +559,7 @@ main() {
       -f|--ffs)        need_val "$1" $#; ffs="$2"; shift 2 ;;
       --dxeinject)     need_val "$1" $#; dxe="$2"; shift 2 ;;
       --dxeinject-url) need_val "$1" $#; DXEINJECT_URL="$2"; shift 2 ;;
+      --direct)        EG_VARIANT="direct"; shift ;;
       --oc-version)    need_val "$1" $#; OC_VERSION="$2"; shift 2 ;;
       --tools-dir)     need_val "$1" $#; TOOLS_DIR="$2"; shift 2 ;;
       --no-fetch)      NO_FETCH="yes"; shift ;;

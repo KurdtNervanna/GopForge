@@ -116,6 +116,7 @@ Handy options:
 ```
 -o, --output <file>      output path (default: <dump>-enablegop.rom)
 -f, --ffs <file>         path to EnableGop.ffs (auto-fetched if absent)
+    --direct             use the EnableGopDirect variant (see troubleshooting)
     --dxeinject <p>      path to DXEInject
     --dxeinject-url <u>  HTTPS URL to auto-fetch DXEInject (SHA-256 pinned)
     --oc-version <v>     OpenCore release to pull EnableGop.ffs from
@@ -140,6 +141,43 @@ Handy options:
 None of these can *prove* a good flash — always open the result in UEFITool and
 eyeball it — but they catch the common ways an injection goes wrong before you
 ever write to the chip.
+
+> **ROM size:** cMP dumps are **2 MiB or 4 MiB** depending on the SPI chip fitted
+> (some 5,1 boards use a 4 MiB `SST25VF032B`). Both are recognized; DXEInject
+> inserts EnableGop into the main DXE volume in either layout.
+
+---
+
+## Troubleshooting: no boot screen after flashing
+
+A clean, validated flash can still give **no pre-boot screen** — because
+main-firmware EnableGop only *supplies OpenCore's GOP plumbing*; the **GPU itself
+must be able to render before OpenCore**. Per the official
+[EnableGop notes](https://github.com/acidanthera/OpenCorePkg/tree/master/Utilities/EnableGop),
+work through this:
+
+1. **Test with `BootKicker.efi`** (from the OpenCore release). Launch it and see
+   whether the **native Apple boot picker** appears.
+   - **Picker shows** → the card *can* do pre-boot graphics. If the standard
+     build gave nothing, re-inject with **`--direct`** (the `EnableGopDirect`
+     variant, for GPUs that need `DirectGopRendering`), then re-flash.
+   - **Nothing shows** → the card has no usable GOP in its own option ROM. Main
+     firmware alone can't fix this (next point).
+2. **Cards that rely on OCLP "Enable AMD GOP"** (many ex-mining / older AMD cards,
+   including some **R9 Fury / Fiji**) have **no GOP in their VBIOS**. To get
+   graphics *before* OpenCore you must **burn a GOP driver into the GPU's own
+   firmware** with EnableGop's `vBiosInsert.sh` + `amdvbflash` — a separate,
+   riskier procedure from flashing the boot ROM. See the OpenCore EnableGop
+   README and the MacRumors *pre-OpenCore GOP* thread.
+3. **Check the display connection** — the boot screen appears on the port the GOP
+   initializes; try **DisplayPort**, a single monitor, connected before power-on.
+4. **Confirm variant vs config** — use `EnableGopDirect` (`--direct`) when your
+   OpenCore `UEFI/Output/DirectGopRendering` is `true`; the standard build
+   otherwise (it renders faster).
+
+Both variants share the same FFS GUID, so GopForge validates either one. Start
+from a **clean, un-injected dump** each time you switch variants (the tool
+refuses to inject into a ROM that already contains EnableGop).
 
 ---
 
