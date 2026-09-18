@@ -62,7 +62,7 @@ What this tool will *not* let you do accidentally:
 | Thing | How the script gets it |
 | --- | --- |
 | **`EnableGop.ffs`** | **Auto-fetched** over HTTPS from the official OpenCorePkg release (`Utilities/EnableGop/EnableGop_<ver>.ffs`). It picks the standard, newest, non-dev `.ffs` — not the `EnableGopDirect` variant. Override the version with `--oc-version`, or supply your own with `-f`. |
-| **`DXEInject`** | You supply it. It's a **dosdude1** tool (dosdude1.com), *not* part of OpenCore, and that host is HTTP-only and unsigned — so this script never downloads it by default. Drop it in `./tools/`, pass `--dxeinject <path>`, or point `--dxeinject-url` at an HTTPS copy you trust (its SHA-256 is pinned on first fetch). |
+| **`DXEInject`** | **Auto-fetched** over HTTPS from `dosdude1.com/apps/DXEInject.zip` by default. It's a **dosdude1** tool, *not* part of OpenCore, and unsigned — so its SHA-256 is pinned on first fetch (trust-on-first-use) and a later change is refused. To use your own copy instead, drop it in `./tools/`, pass `--dxeinject <path>`, or override `--dxeinject-url`. |
 | **Macschrauber's Rom Dump** | For the actual dump and flash. Not called by this script — you run it yourself. |
 
 `bash`, `perl`, `cmp`, `awk`, plus `curl`/`wget` and `unzip` for fetching — all
@@ -71,8 +71,8 @@ present by default on macOS and virtually every Linux.
 Grab the dependencies ahead of time if you like:
 
 ```bash
-./gopforge.sh --fetch                                 # EnableGop.ffs only
-./gopforge.sh --fetch --dxeinject-url https://…/DXEInject   # + DXEInject
+./gopforge.sh --fetch                                 # EnableGop.ffs + DXEInject
+./gopforge.sh --fetch --dxeinject-url https://…/DXEInject   # override the source
 ```
 
 > Manual alternative to DXEInject: insert the `.ffs` into the DXE volume by hand

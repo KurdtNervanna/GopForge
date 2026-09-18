@@ -18,14 +18,19 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
-VERSION="0.3.0"
+VERSION="0.4.0"
 PROG="$(basename "$0")"
 
 # Default OpenCore release to pull EnableGop.ffs from (override with --oc-version).
 OC_VERSION="1.0.7"
 # Auto-fetch behaviour (set by flags in main()).
 NO_FETCH="no"
-DXEINJECT_URL=""
+# Default source for DXEInject (dosdude1). The host now serves this file over
+# HTTPS (Cloudflare), so it is safe to fetch by default. It is still a
+# third-party, unsigned executable: its sha256 is pinned on first fetch (TOFU)
+# and a later change is refused. Override with --dxeinject-url, or supply the
+# binary yourself with --dxeinject / TOOLS_DIR.
+DXEINJECT_URL="https://dosdude1.com/apps/DXEInject.zip"
 TOOLS_DIR="./tools"
 
 # ----------------------------------------------------------------------------
@@ -65,7 +70,7 @@ ${C_BOLD}USAGE${C_RESET}
 ${C_BOLD}MODES${C_RESET}
   --fetch              Download dependencies into $TOOLS_DIR without injecting:
                        EnableGop.ffs from the official OpenCore release, and
-                       DXEInject if --dxeinject-url is given.
+                       DXEInject from dosdude1 (override with --dxeinject-url).
   --check <rom>        Inspect a ROM only: size, firmware sanity, EnableGop
                        present?, sha256. Use it BEFORE and AFTER injecting.
   --inject <rom>       Inject EnableGop into <rom> and validate the result.
@@ -87,9 +92,10 @@ ${C_BOLD}OPTIONS${C_RESET}
 ${C_BOLD}DEPENDENCY NOTES${C_RESET}
   EnableGop.ffs is fetched over HTTPS from the official OpenCorePkg release
   (Utilities/EnableGop/). DXEInject is a separate dosdude1 tool, NOT part of
-  OpenCore, and its host is HTTP-only — so it is never downloaded by default.
-  Supply it yourself (drop in $TOOLS_DIR/, or --dxeinject <path>), or point
-  --dxeinject-url at an HTTPS copy you trust; its sha256 is pinned on first use.
+  OpenCore; it is fetched over HTTPS from dosdude1.com by default. It is an
+  unsigned third-party executable, so its sha256 is pinned on first fetch (TOFU)
+  and a later change is refused. To use your own copy instead, drop it in
+  $TOOLS_DIR/, pass --dxeinject <path>, or override --dxeinject-url.
 
 ${C_BOLD}SAFETY${C_RESET}
   This tool only PREPARES a ROM. You still flash it with Macschrauber's
@@ -207,9 +213,9 @@ fetch_enablegop_ffs() {
 
 # ----------------------------------------------------------------------------
 # auto-fetch DXEInject (executable) from a URL, with trust-on-first-use pinning
-#   No default URL is baked in: the only known host is HTTP-only and unsigned,
-#   so you point --dxeinject-url at a copy you trust. On first fetch we record
-#   its sha256; on later fetches a changed binary is refused.
+#   Defaults to dosdude1's HTTPS copy (see DXEINJECT_URL); override with
+#   --dxeinject-url to point at a copy you trust. DXEInject is unsigned, so on
+#   first fetch we record its sha256; on later fetches a changed binary is refused.
 # ----------------------------------------------------------------------------
 fetch_dxeinject() {
   local url="$1" dest="$2"
@@ -326,7 +332,7 @@ do_inject() {
     [ -f "$ffs" ] || fetch_enablegop_ffs "$OC_VERSION" "$ffs"
   fi
 
-  # --- DXEInject (auto-fetch only from a URL you trust) -------------------
+  # --- DXEInject (uses a local copy if present, else auto-fetches) --------
   if [ -z "$dxe" ]; then
     if command -v DXEInject >/dev/null 2>&1; then dxe="$(command -v DXEInject)"
     elif [ -x "$TOOLS_DIR/DXEInject" ]; then dxe="$TOOLS_DIR/DXEInject"
@@ -337,14 +343,14 @@ do_inject() {
     fetch_dxeinject "$DXEINJECT_URL" "$TOOLS_DIR/DXEInject"
     dxe="$TOOLS_DIR/DXEInject"
   fi
-  [ -n "$dxe" ] && [ -x "$dxe" ] || die "DXEInject not found. Provide it by:
-       • putting it on your PATH or in $TOOLS_DIR/
+  [ -n "$dxe" ] && [ -x "$dxe" ] || die "DXEInject not available. It normally
+     auto-fetches over HTTPS from dosdude1.com; this failed or was disabled.
+     Provide it by:
+       • dropping the binary in $TOOLS_DIR/ or on your PATH
        • passing it with --dxeinject <path>
-       • auto-fetching a trusted copy with --dxeinject-url <https-url>
+       • pointing --dxeinject-url at an HTTPS copy you trust
+       • re-running without --no-fetch to allow the default download
      DXEInject is a dosdude1 tool (dosdude1.com) and is NOT part of OpenCore.
-     That host is HTTP-only and unsigned, so this script will not download it
-     by default — grab it in a browser, verify it, and host/point an HTTPS URL
-     at your own copy, or just drop the file in $TOOLS_DIR/.
      Manual alternative: insert EnableGop.ffs into the DXE volume with
      UEFITool 0.25.1 (newer UEFITool builds cannot write)."
 
