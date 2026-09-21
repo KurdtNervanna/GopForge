@@ -18,7 +18,7 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
-VERSION="0.5.0"
+VERSION="0.6.0"
 PROG="$(basename "$0")"
 
 # Default OpenCore release to pull EnableGop.ffs from (override with --oc-version).
@@ -27,6 +27,10 @@ OC_VERSION="1.0.7"
 # "direct" (EnableGopDirect_*.ffs). Both share the same FFS GUID; the Direct
 # variant is the one to use when the GPU needs DirectGopRendering (set by --direct).
 EG_VARIANT="standard"
+# A MacPro4,1/5,1 BootROM is exactly 4 MiB. inject refuses any other size unless
+# this override is set (set by --allow-size, for advanced/edge cases only).
+CMP_ROM_SIZE=4194304
+ALLOW_SIZE="no"
 # Auto-fetch behaviour (set by flags in main()).
 NO_FETCH="no"
 # Default source for DXEInject (dosdude1). The host now serves this file over
@@ -91,6 +95,8 @@ ${C_BOLD}OPTIONS${C_RESET}
       --oc-version <v>    OpenCore release to pull EnableGop.ffs from (def: $OC_VERSION)
       --tools-dir <dir>   Where fetched tools go (default: ./tools)
       --no-fetch          Never download anything; require local files
+      --allow-size        Allow injecting into a ROM that is not 4 MiB
+                          (a MacPro4,1/5,1 BootROM is exactly 4 MiB; advanced use)
       --force             Overwrite an existing output file
   -y, --yes               Non-interactive; assume yes at confirmations
   -h, --help              This help
@@ -283,16 +289,16 @@ do_check() {
   printf '  size    : %s (%s bytes)\n' "$(human "$size")" "$size"
   printf '  sha256  : %s\n' "$(sha256_of "$rom")"
 
-  # size sanity — cMP boot ROM dumps are 2 MiB or 4 MiB depending on the SPI
-  # chip fitted (e.g. a 4 MiB SST25VF032B on some 5,1 boards). We only warn.
+  # size sanity — a MacPro4,1/5,1 BootROM is EXACTLY 4 MiB (32 Mbit SPI, e.g.
+  # SST25VF032B; every factory 4,1/5,1 uses a 4 MiB part). A 2 MiB image is NOT
+  # a 4,1/5,1 BootROM — earlier Mac Pros (3,1 and older) are a different, non-SPI,
+  # non-EnableGop-compatible firmware — so anything but 4 MiB is flagged.
   case "$size" in
-    2097152) printf '  layout  : %s2 MiB — typical cMP dump%s\n' "$C_GRN" "$C_RESET" ;;
-    4194304) printf '  layout  : %s4 MiB — cMP dump (larger SPI chip, e.g. SST25VF032B)%s\n' "$C_GRN" "$C_RESET" ;;
-    1048576|8388608)
-             printf '  layout  : %s%s — a power-of-two flash size%s\n' "$C_YEL" "$(human "$size")" "$C_RESET"
-             warn "not a usual 2/4 MiB cMP dump size — double-check this is the right file" ;;
-    *)       printf '  layout  : %s%s — unusual size%s\n' "$C_YEL" "$(human "$size")" "$C_RESET"
-             warn "size is not a typical flash-chip size; is this really a full ROM dump?" ;;
+    4194304) printf '  layout  : %s4 MiB — MacPro4,1/5,1 BootROM%s\n' "$C_GRN" "$C_RESET" ;;
+    2097152) printf '  layout  : %s2 MiB — NOT a MacPro4,1/5,1 BootROM%s\n' "$C_RED" "$C_RESET"
+             warn "2 MiB is a pre-4,1 Mac Pro (or a partial dump); EnableGop cannot be added to it." ;;
+    *)       printf '  layout  : %s%s — not the 4 MiB cMP 4,1/5,1 size%s\n' "$C_RED" "$(human "$size")" "$C_RESET"
+             warn "a MacPro4,1/5,1 BootROM dump is exactly 4 MiB — double-check this is the right file." ;;
   esac
 
   if looks_like_firmware "$rom"; then
@@ -338,6 +344,18 @@ do_inject() {
   [ -r "$in" ] || die "input ROM not readable: $in"
   local in_size; in_size="$(file_size "$in")"
   [ "$in_size" -gt 0 ] || die "input ROM is empty: $in"
+
+  # --- size gate: a MacPro4,1/5,1 BootROM is exactly 4 MiB ----------------
+  if [ "$in_size" -ne "$CMP_ROM_SIZE" ]; then
+    if [ "$ALLOW_SIZE" = "yes" ]; then
+      warn "input is $(human "$in_size"), not the 4 MiB MacPro4,1/5,1 size — continuing (--allow-size)."
+    else
+      die "input is $(human "$in_size") ($in_size bytes), not the 4 MiB (4194304 bytes)
+     of a MacPro4,1/5,1 BootROM. A 2 MiB image is a pre-4,1 Mac Pro or a partial
+     dump and cannot take EnableGop. Re-dump the full 4 MiB BootROM with Rom Dump,
+     or pass --allow-size if you truly know this is correct."
+    fi
+  fi
 
   # --- EnableGop.ffs (auto-fetch if missing) ------------------------------
   if [ ! -f "$ffs" ]; then
@@ -563,6 +581,7 @@ main() {
       --oc-version)    need_val "$1" $#; OC_VERSION="$2"; shift 2 ;;
       --tools-dir)     need_val "$1" $#; TOOLS_DIR="$2"; shift 2 ;;
       --no-fetch)      NO_FETCH="yes"; shift ;;
+      --allow-size)    ALLOW_SIZE="yes"; shift ;;
       --force)         force="yes"; shift ;;
       -y|--yes)        yes="yes"; shift ;;
       -h|--help)       usage; exit 0 ;;

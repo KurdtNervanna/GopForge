@@ -18,10 +18,14 @@ flash and no OpenCore required.
 
 ## ⚠️ Read this first
 
-Flashing the boot ROM of a Mac Pro 4,1/5,1 can **brick the machine**. If a flash
-goes wrong, the only way back is hardware: a **CH341A programmer with a SOIC-8
-clip** on the SPI chip, or a **"Matt card."** Do not begin unless you have that
-recovery path and an **untouched backup** of your original dump.
+Flashing the boot ROM of a Mac Pro 4,1/5,1 can **brick the machine**. The normal
+dump/flash is done **in-system in software** with Macschrauber's Rom Dump — no
+desoldering — which is how EnableGop is installed. But if a flash goes wrong the
+machine may no longer boot to run that software, and then the only way back is
+**hardware**: reprogramming the SPI chip with a **CH341A + SOIC-8 clip** (the chip
+is soldered, so in practice this usually means desoldering it) or a **"Matt
+card."** Do not begin unless you have that recovery path and an **untouched
+backup** of your original dump.
 
 This tool is provided **as-is, with no warranty** (see [LICENSE](LICENSE)). It has
 **not** been validated against every possible ROM revision — it validates *your*
@@ -142,9 +146,12 @@ None of these can *prove* a good flash — always open the result in UEFITool an
 eyeball it — but they catch the common ways an injection goes wrong before you
 ever write to the chip.
 
-> **ROM size:** cMP dumps are **2 MiB or 4 MiB** depending on the SPI chip fitted
-> (some 5,1 boards use a 4 MiB `SST25VF032B`). Both are recognized; DXEInject
-> inserts EnableGop into the main DXE volume in either layout.
+> **ROM size:** a **MacPro4,1/5,1 BootROM is exactly 4 MiB** (a 32 Mbit SPI part
+> such as the `SST25VF032B` — every factory 4,1/5,1 uses a 4 MiB chip). `--check`
+> flags anything else, and `--inject` **refuses** a non-4 MiB image (override with
+> `--allow-size`). A 2 MiB image is a pre-4,1 Mac Pro (3,1 and older use a
+> different, non-SPI firmware that is not EnableGop-compatible) or a partial dump,
+> and EnableGop cannot be added to it.
 
 ---
 
