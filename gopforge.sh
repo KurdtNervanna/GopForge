@@ -18,7 +18,7 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
-VERSION="0.6.0"
+VERSION="0.7.0"
 PROG="$(basename "$0")"
 
 # Default OpenCore release to pull EnableGop.ffs from (override with --oc-version).
@@ -95,8 +95,8 @@ ${C_BOLD}OPTIONS${C_RESET}
       --oc-version <v>    OpenCore release to pull EnableGop.ffs from (def: $OC_VERSION)
       --tools-dir <dir>   Where fetched tools go (default: ./tools)
       --no-fetch          Never download anything; require local files
-      --allow-size        Allow injecting into a ROM that is not 4 MiB
-                          (a MacPro4,1/5,1 BootROM is exactly 4 MiB; advanced use)
+      --allow-size        Bypass the MacPro4,1/5,1 checks — the 4 MiB size AND
+                          the "is this a 4,1/5,1 BootROM?" fingerprint (advanced use)
       --force             Overwrite an existing output file
   -y, --yes               Non-interactive; assume yes at confirmations
   -h, --help              This help
@@ -147,6 +147,14 @@ looks_like_firmware() { # 0 if a UEFI firmware volume header signature is presen
 # stored little-endian in the image as the 16 raw bytes below.
 EG_GUID_HEX="b158ba3fc0f8bc41acd8253043a3a17f"
 
+# Fingerprint of a MacPro4,1/5,1 BootROM: the DXE driver that DXEInject inserts
+# EnableGop *after* — GUID BAE7599F-3C6B-43B7-BDF0-9CE07AA91AA6 — lives in the
+# main DXE volume of the 4,1/5,1 firmware. Its presence is a positive ID of a
+# supported BootROM; its absence means this isn't a 4,1/5,1 (e.g. a 3,1/2,1, an
+# iMac, or a non-Apple image), where EnableGop cannot be placed. Stored
+# little-endian in the image as the 16 raw bytes below.
+EG_ANCHOR_GUID_HEX="9f59e7ba6b3cb743bdf09ce07aa91aa6"
+
 contains_bytes() { # <file> <lowercase-hex> : 0 if the byte sequence occurs
   have_perl || return 2
   perl -e 'my($f,$h)=@ARGV; my $p=pack("H*",$h); local $/;
@@ -162,6 +170,13 @@ ffs_guid_hex() { # print the first 16 bytes of an .ffs as lowercase hex (its GUI
 
 has_enablegop() { # 0 if the EnableGop FFS GUID is present in <rom>
   contains_bytes "$1" "$EG_GUID_HEX"
+}
+
+# cMP 4,1/5,1 BootROM identity via the EnableGop insertion-point GUID.
+# prints: yes | no | unknown   (unknown = perl unavailable, can't check)
+cmp_bootrom_state() {
+  have_perl || { echo unknown; return; }
+  if contains_bytes "$1" "$EG_ANCHOR_GUID_HEX"; then echo yes; else echo no; fi
 }
 
 human() { # bytes → human
@@ -308,6 +323,14 @@ do_check() {
     warn "this may not be a raw UEFI firmware dump"
   fi
 
+  case "$(cmp_bootrom_state "$rom")" in
+    yes)     printf '  model   : %sMacPro4,1/5,1 BootROM (EnableGop insertion point found)%s\n' "$C_GRN" "$C_RESET" ;;
+    no)      printf '  model   : %sNOT a MacPro4,1/5,1 BootROM%s\n' "$C_RED" "$C_RESET"
+             warn "EnableGop insertion point not found — this is not a supported 4,1/5,1 firmware"
+             warn "(MacPro3,1 and earlier, iMacs, or non-Apple images are not compatible)." ;;
+    unknown) printf '  model   : %s(perl unavailable — not checked)%s\n' "$C_DIM" "$C_RESET" ;;
+  esac
+
   if has_enablegop "$rom"; then
     printf '  enablegop: %sPRESENT%s\n' "$C_YEL" "$C_RESET"
     say "  ${C_DIM}(injecting again would create a duplicate — inject only into a clean dump)${C_RESET}"
@@ -356,6 +379,22 @@ do_inject() {
      or pass --allow-size if you truly know this is correct."
     fi
   fi
+
+  # --- firmware identity: must be a MacPro4,1/5,1 BootROM -----------------
+  case "$(cmp_bootrom_state "$in")" in
+    no)
+      if [ "$ALLOW_SIZE" = "yes" ]; then
+        warn "EnableGop insertion point not found — this may not be a MacPro4,1/5,1 BootROM; continuing (--allow-size)."
+      else
+        die "this is not a MacPro4,1/5,1 BootROM: the EnableGop insertion point
+     (DXE driver BAE7599F-3C6B-43B7-BDF0-9CE07AA91AA6) was not found, so DXEInject
+     has nowhere to place the driver. Only MacPro4,1/5,1 are supported —
+     MacPro3,1 and earlier (and iMacs, and non-Apple firmware) use different,
+     non-EnableGop-compatible firmware. If you are certain, re-run with --allow-size."
+      fi ;;
+    unknown)
+      warn "cannot verify this is a MacPro4,1/5,1 BootROM (perl unavailable) — proceeding." ;;
+  esac
 
   # --- EnableGop.ffs (auto-fetch if missing) ------------------------------
   if [ ! -f "$ffs" ]; then
