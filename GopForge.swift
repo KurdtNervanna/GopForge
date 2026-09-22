@@ -110,12 +110,12 @@ final class Controller: NSObject, NSApplicationDelegate {
         textView.backgroundColor = .textBackgroundColor
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: .greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: 0, height: .greatestFiniteMagnitude)
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         scroll.documentView = textView
 
         for v in [selectBtn!, romLabel!, variantCaption, variant!, inspectBtn!, prepareBtn!, fetchBtn!, revealBtn!, spinner!, statusLabel!, scroll] {
