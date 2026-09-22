@@ -9,18 +9,15 @@
 #
 # It produces GopForge.app next to this script and reveals it in Finder.
 #
-# PREFERRED build (in-app log window, just like Macschrauber's Rom Dump):
-#   If Platypus's command-line tool is installed, the app is built as a Platypus
-#   "Text Window" app — GopForge's status/log is shown INSIDE the app window.
-#   Install Platypus once:  brew install --cask platypus
-#   then open Platypus → Preferences → "Install Command Line Tool", and re-run.
+# It picks the best UI your Mac can compile, in this order:
+#   1. Native Swift app (PREFERRED) — one window: buttons + a colored, streaming
+#      log. Needs Apple's Command Line Tools (free):  xcode-select --install
+#   2. Platypus "Text Window" app — log in-app, input via dialogs. Needs the
+#      Platypus CLI (https://sveinbjorn.org/platypus → Install Command Line Tool).
+#   3. Terminal-log fallback — a plain .app whose launcher shows the log in Terminal.
 #
-# FALLBACK build (no Platypus):
-#   A plain .app whose launcher opens a Terminal window for the log. Functional,
-#   but the log is in Terminal rather than in-app.
-#
-# Either way this changes NONE of GopForge's logic — it bundles the unchanged
-# gopforge.sh and the gopforge-gui.command front-end and calls them.
+# This changes NONE of GopForge's logic — it bundles the unchanged gopforge.sh
+# (and, for the fallbacks, gopforge-gui.command) and calls them.
 #
 # SPDX-License-Identifier: MIT
 set -euo pipefail
@@ -28,7 +25,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="$HERE/GopForge.app"
 APPNAME="GopForge"
-VERSION="0.8.0"
+VERSION="0.8.1"
 BUNDLE_ID="com.kurdtnervanna.gopforge"
 
 command -v osascript >/dev/null 2>&1 || { echo "This builder requires macOS."; exit 1; }

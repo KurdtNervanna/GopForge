@@ -16,7 +16,7 @@ final class Controller: NSObject, NSApplicationDelegate {
     var textView: NSTextView!
     var romLabel: NSTextField!
     var variant: NSSegmentedControl!
-    var selectBtn, inspectBtn, prepareBtn, fetchBtn, revealBtn: NSButton!
+    var selectBtn, inspectBtn, prepareBtn, fetchBtn, romDumpBtn, revealBtn: NSButton!
     var spinner: NSProgressIndicator!
     var statusLabel: NSTextField!
 
@@ -54,7 +54,7 @@ final class Controller: NSObject, NSApplicationDelegate {
     }
 
     func buildWindow() {
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 860, height: 560),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
         window.title = "GopForge"
@@ -73,6 +73,7 @@ final class Controller: NSObject, NSApplicationDelegate {
         inspectBtn = button("Inspect", #selector(inspect))
         prepareBtn = button("Prepare", #selector(prepare))
         fetchBtn = button("Download Tools", #selector(fetch))
+        romDumpBtn = button("Get Rom Dump", #selector(openRomDump))
         revealBtn = button("Reveal Output", #selector(reveal)); revealBtn.isEnabled = false
 
         romLabel = NSTextField(labelWithString: "No ROM selected")
@@ -118,7 +119,7 @@ final class Controller: NSObject, NSApplicationDelegate {
         textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         scroll.documentView = textView
 
-        for v in [selectBtn!, romLabel!, variantCaption, variant!, inspectBtn!, prepareBtn!, fetchBtn!, revealBtn!, spinner!, statusLabel!, scroll] {
+        for v in [selectBtn!, romLabel!, variantCaption, variant!, inspectBtn!, prepareBtn!, fetchBtn!, romDumpBtn!, revealBtn!, spinner!, statusLabel!, scroll] {
             content.addSubview(v)
         }
 
@@ -141,7 +142,9 @@ final class Controller: NSObject, NSApplicationDelegate {
             prepareBtn.centerYAnchor.constraint(equalTo: inspectBtn.centerYAnchor),
             fetchBtn.leadingAnchor.constraint(equalTo: prepareBtn.trailingAnchor, constant: 8),
             fetchBtn.centerYAnchor.constraint(equalTo: inspectBtn.centerYAnchor),
-            spinner.leadingAnchor.constraint(equalTo: fetchBtn.trailingAnchor, constant: 12),
+            romDumpBtn.leadingAnchor.constraint(equalTo: fetchBtn.trailingAnchor, constant: 8),
+            romDumpBtn.centerYAnchor.constraint(equalTo: inspectBtn.centerYAnchor),
+            spinner.leadingAnchor.constraint(equalTo: romDumpBtn.trailingAnchor, constant: 12),
             spinner.centerYAnchor.constraint(equalTo: inspectBtn.centerYAnchor),
             statusLabel.leadingAnchor.constraint(equalTo: spinner.trailingAnchor, constant: 8),
             statusLabel.centerYAnchor.constraint(equalTo: inspectBtn.centerYAnchor),
@@ -231,6 +234,15 @@ final class Controller: NSObject, NSApplicationDelegate {
 
     @objc func reveal() {
         if let o = lastOutput { NSWorkspace.shared.activateFileViewerSelecting([o]) }
+    }
+
+    @objc func openRomDump() {
+        // GopForge prepares a ROM; the actual dump + flash are done with
+        // Macschrauber's Rom Dump. Open its official releases page.
+        if let u = URL(string: "https://github.com/Macschrauber/Macschrauber-s-Rom-Dump/releases") {
+            NSWorkspace.shared.open(u)
+            appendLine("» Opening Macschrauber's Rom Dump releases page (for dumping + flashing)…", .systemBlue)
+        }
     }
 
     // MARK: run gopforge.sh
