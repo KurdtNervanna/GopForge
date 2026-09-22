@@ -285,6 +285,17 @@ final class Controller: NSObject, NSApplicationDelegate {
     }
     func color(for line: String) -> NSColor {
         let t = line.trimmingCharacters(in: .whitespaces)
+        // --check status lines have no leading marker — color them by content
+        if t.hasPrefix("enablegop:") {
+            if t.contains("PRESENT") { return .systemGreen }      // a GOP driver is in the ROM
+            if t.contains("not present") { return .systemOrange } // clean dump (no GOP yet)
+        }
+        if t.hasPrefix("instances:") { return .systemRed }        // duplicate EnableGop
+        if t.hasPrefix("model") {
+            if t.contains("NOT") { return .systemRed }            // not a 4,1/5,1 BootROM
+            if t.contains("MacPro4,1/5,1") { return .systemGreen }
+        }
+        // marker-prefixed lines
         if t.hasPrefix("✓") { return .systemGreen }
         if t.hasPrefix("✗") { return .systemRed }
         if t.hasPrefix("!") { return .systemYellow }
