@@ -82,9 +82,10 @@ else
   # FALLBACK: plain .app whose launcher opens Terminal for the log
   # ==========================================================================
   echo "Platypus CLI not found — building the Terminal-log fallback app."
-  echo "  For the in-app log window (like Rom Dump), install Platypus:"
-  echo "     brew install --cask platypus"
-  echo "  then open Platypus → Preferences → Install Command Line Tool, and re-run this."
+  echo "  For the in-app log window (like Rom Dump), install Platypus (no Homebrew needed):"
+  echo "    1. Download it from https://sveinbjorn.org/platypus  and drag Platypus.app to /Applications"
+  echo "    2. Open Platypus → menu Platypus → Preferences → 'Install Command Line Tool'"
+  echo "    3. Re-run:  bash build-app.command"
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

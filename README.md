@@ -112,8 +112,9 @@ bash build-app.command
 
 - If **Platypus's command-line tool** is installed, the app is built as a
   Platypus *Text Window* app — the status/log is shown **inside the app window**,
-  like Rom Dump. Install it once with `brew install --cask platypus`, then open
-  Platypus → **Preferences → Install Command Line Tool**, and re-run.
+  like Rom Dump. Install Platypus once (no Homebrew needed): download it from
+  <https://sveinbjorn.org/platypus>, drag `Platypus.app` to `/Applications`, then
+  open Platypus → **Preferences → Install Command Line Tool**, and re-run.
 - Otherwise a plain `.app` is built whose launcher shows the log in **Terminal**.
 
 Because the app is built locally it carries no Gatekeeper quarantine and
