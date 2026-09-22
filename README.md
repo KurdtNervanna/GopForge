@@ -95,13 +95,22 @@ the real driver, not a guessed string.
 
 ## GUI (macOS)
 
-If you'd rather not use the command line, GopForge has a native front-end — the
-same kind of AppleScript dialogs Macschrauber's Rom Dump uses — that walks you
-through *Prepare / Inspect / Download*, picks the variant (Standard vs
-`--direct`), and shows the result. It **changes none of GopForge's logic**: it
-collects your choices and calls `gopforge.sh` with the matching flags. Downloaded
-tools (`EnableGop.ffs`, `DXEInject`) are cached in
-`~/Library/Application Support/GopForge/tools`. macOS only.
+If you'd rather not use the command line, GopForge has a native single-window
+app — buttons for *Select ROM / Inspect / Prepare / Download Tools*, a
+Standard/Direct selector, and a **colored, streaming log** in the same window. It
+**changes none of GopForge's logic**: it collects your choices and calls
+`gopforge.sh` with the matching flags. Downloaded tools (`EnableGop.ffs`,
+`DXEInject`) are cached in `~/Library/Application Support/GopForge/tools`. macOS only.
+
+| Inspect | Prepare |
+| --- | --- |
+| ![Inspecting a ROM](docs/screenshot-inspect.png) | ![Preparing a ROM](docs/screenshot-prepare.png) |
+
+<sub>UI previews (rendered from the app's actual layout and output).</sub>
+
+The easiest way to get the app is the **[Releases](../../releases)** page — download
+`GopForge-<version>-macOS.zip`, unzip, and (first launch) **right-click → Open**
+to clear Gatekeeper. Or build it yourself:
 
 **Build the app** (`GopForge.app`) — run once on the Mac, in the folder holding
 `gopforge.sh`, `gopforge-gui.command`, `build-app.command` and `AppIcon.png`:
