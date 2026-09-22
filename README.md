@@ -95,18 +95,32 @@ the real driver, not a guessed string.
 
 ## GUI (macOS)
 
-If you'd rather not use the command line, **double-click `gopforge-gui.command`**
-in Finder. It's a thin native front-end — the same kind of AppleScript dialogs
-Macschrauber's Rom Dump uses — that walks you through *Prepare / Inspect /
-Download*, picks the variant (Standard vs `--direct`), and shows the result.
+If you'd rather not use the command line, GopForge has a native front-end — the
+same kind of AppleScript dialogs Macschrauber's Rom Dump uses — that walks you
+through *Prepare / Inspect / Download*, picks the variant (Standard vs
+`--direct`), and shows the result. It **changes none of GopForge's logic**: it
+collects your choices and calls `gopforge.sh` with the matching flags. Downloaded
+tools (`EnableGop.ffs`, `DXEInject`) are cached in
+`~/Library/Application Support/GopForge/tools`. macOS only.
 
-It **changes none of GopForge's logic**: it just collects your choices and calls
-`gopforge.sh` with the matching flags, and the full validation log appears in the
-Terminal window it opens. Keep `gopforge-gui.command` in the same folder as
-`gopforge.sh`. (macOS only — Linux/Windows users run `gopforge.sh` directly.)
+**Build the app** (`GopForge.app`) — run once on the Mac, in the folder holding
+`gopforge.sh`, `gopforge-gui.command`, `build-app.command` and `AppIcon.png`:
 
-> On first launch, macOS Gatekeeper may block a downloaded `.command`. Either
-> right-click → **Open** once, or run `xattr -dr com.apple.quarantine gopforge-gui.command`.
+```bash
+bash build-app.command
+```
+
+- If **Platypus's command-line tool** is installed, the app is built as a
+  Platypus *Text Window* app — the status/log is shown **inside the app window**,
+  like Rom Dump. Install it once with `brew install --cask platypus`, then open
+  Platypus → **Preferences → Install Command Line Tool**, and re-run.
+- Otherwise a plain `.app` is built whose launcher shows the log in **Terminal**.
+
+Because the app is built locally it carries no Gatekeeper quarantine and
+double-clicks without a prompt.
+
+**No-build option:** you can also just **double-click `gopforge-gui.command`** —
+it runs the same GUI, with the log in a Terminal window.
 
 ---
 
