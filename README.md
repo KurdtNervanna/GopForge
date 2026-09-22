@@ -93,7 +93,24 @@ the real driver, not a guessed string.
 
 ---
 
-## Usage
+## GUI (macOS)
+
+If you'd rather not use the command line, **double-click `gopforge-gui.command`**
+in Finder. It's a thin native front-end — the same kind of AppleScript dialogs
+Macschrauber's Rom Dump uses — that walks you through *Prepare / Inspect /
+Download*, picks the variant (Standard vs `--direct`), and shows the result.
+
+It **changes none of GopForge's logic**: it just collects your choices and calls
+`gopforge.sh` with the matching flags, and the full validation log appears in the
+Terminal window it opens. Keep `gopforge-gui.command` in the same folder as
+`gopforge.sh`. (macOS only — Linux/Windows users run `gopforge.sh` directly.)
+
+> On first launch, macOS Gatekeeper may block a downloaded `.command`. Either
+> right-click → **Open** once, or run `xattr -dr com.apple.quarantine gopforge-gui.command`.
+
+---
+
+## Usage (command line)
 
 Make it executable once:
 
