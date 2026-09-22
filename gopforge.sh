@@ -18,7 +18,7 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
-VERSION="0.7.0"
+VERSION="0.8.0"
 PROG="$(basename "$0")"
 
 # Default OpenCore release to pull EnableGop.ffs from (override with --oc-version).
@@ -179,6 +179,52 @@ cmp_bootrom_state() {
   if contains_bytes "$1" "$EG_ANCHOR_GUID_HEX"; then echo yes; else echo no; fi
 }
 
+# how many times the EnableGop FFS GUID occurs in <rom> (duplicate detection)
+count_enablegop() {
+  have_perl || { echo "?"; return; }
+  perl -e 'my($f,$h)=@ARGV; my $g=pack("H*",$h); local $/;
+           open(my $fh,"<:raw",$f) or exit; my $d=<$fh>; my ($n,$p)=(0,0);
+           while(($p=index($d,$g,$p))>=0){$n++;$p++} print $n' "$1" "$EG_GUID_HEX"
+}
+
+# declared FFS file size at the first EnableGop GUID occurrence (3-byte field at
+# GUID+0x14). Standard and Direct share a GUID but differ in size, so this tells
+# them apart. prints the size in bytes, or nothing if absent/unavailable.
+enablegop_ffs_size() {
+  have_perl || return 2
+  perl -e 'my($f,$h)=@ARGV; my $g=pack("H*",$h); local $/;
+           open(my $fh,"<:raw",$f) or exit 2; my $d=<$fh>;
+           my $i=index($d,$g); exit 1 if $i<0;
+           my @s=unpack("C3",substr($d,$i+0x14,3));
+           print $s[0]|($s[1]<<8)|($s[2]<<16)' "$1" "$EG_GUID_HEX"
+}
+
+# map an EnableGop FFS size to a Standard/Direct label. Sizes are from official
+# OpenCorePkg releases (EnableGop 1.0–1.5-dev); Standard builds are ~12–15 KB and
+# Direct ~20–24 KB, a wide, stable gap — so unrecognized sizes fall back to a
+# threshold guess rather than guessing wrong.
+enablegop_variant_label() {
+  case "$1" in
+    11957) echo "Standard (EnableGop 1.0)" ;;
+    12008) echo "Standard (EnableGop 1.1)" ;;
+    13048) echo "Standard (EnableGop 1.2)" ;;
+    13361) echo "Standard (EnableGop 1.3)" ;;
+    13497) echo "Standard (EnableGop 1.4-dev)" ;;
+    14225) echo "Standard (EnableGop 1.4)" ;;
+    14232|14931) echo "Standard (EnableGop 1.5-dev)" ;;
+    20581) echo "Direct (EnableGopDirect 1.0)" ;;
+    20628) echo "Direct (EnableGopDirect 1.1)" ;;
+    21552) echo "Direct (EnableGopDirect 1.2)" ;;
+    21889) echo "Direct (EnableGopDirect 1.3)" ;;
+    21957) echo "Direct (EnableGopDirect 1.4-dev)" ;;
+    22675) echo "Direct (EnableGopDirect 1.4)" ;;
+    22667|23528) echo "Direct (EnableGopDirect 1.5-dev)" ;;
+    ''|*[!0-9]*) echo "variant unknown" ;;
+    *) if [ "$1" -ge 17500 ]; then echo "likely Direct (unrecognized size $1 B)"
+       else echo "likely Standard (unrecognized size $1 B)"; fi ;;
+  esac
+}
+
 human() { # bytes → human
   awk -v b="$1" 'BEGIN{
     split("B KiB MiB GiB",u," "); i=1;
@@ -332,8 +378,17 @@ do_check() {
   esac
 
   if has_enablegop "$rom"; then
-    printf '  enablegop: %sPRESENT%s\n' "$C_YEL" "$C_RESET"
-    say "  ${C_DIM}(injecting again would create a duplicate — inject only into a clean dump)${C_RESET}"
+    local egsz eglabel egn
+    egsz="$(enablegop_ffs_size "$rom" 2>/dev/null || true)"
+    eglabel="$(enablegop_variant_label "${egsz:-}")"
+    printf '  enablegop: %sPRESENT%s — %s\n' "$C_YEL" "$C_RESET" "$eglabel"
+    egn="$(count_enablegop "$rom")"
+    if [ "$egn" != "?" ] && [ "$egn" -gt 1 ] 2>/dev/null; then
+      printf '  instances: %s%s — DUPLICATES%s\n' "$C_RED" "$egn" "$C_RESET"
+      warn "multiple EnableGop instances is a known fault state — start from a clean dump"
+    else
+      say "  ${C_DIM}(injecting again would create a duplicate — inject only into a clean dump)${C_RESET}"
+    fi
   else
     printf '  enablegop: %snot present%s\n' "$C_DIM" "$C_RESET"
   fi

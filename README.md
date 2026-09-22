@@ -153,6 +153,9 @@ Handy options:
 - **Correct model** — the dump is a **MacPro4,1/5,1 BootROM**: exactly 4 MiB *and*
   containing the EnableGop insertion-point driver (`BAE7599F-…`). A 3,1/2,1, an
   iMac, or any non-4,1/5,1 image is rejected (override: `--allow-size`).
+- **Variant + duplicates** — `--check` reports whether an already-present EnableGop
+  is the **Standard** or **Direct** build (by its FFS size, mapped to the OpenCore
+  release) and flags a ROM that contains more than one instance.
 - **Not already patched** — aborts if EnableGop is already inside the dump.
 - **Size invariant** — the output is byte-for-byte the same *total size* as the
   input (a fixed-size SPI image must not grow or shrink). A mismatch is a hard fail.
