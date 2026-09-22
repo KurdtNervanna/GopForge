@@ -18,9 +18,17 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GOP="$HERE/gopforge.sh"
 
-# runner: prefer the executable bit, fall back to `bash`
+# Cached tools (EnableGop.ffs, DXEInject, its sha256 pin) go in a stable,
+# writable, macOS-standard spot — NOT the app bundle (which may be read-only) or
+# a surprise ./tools in the home folder. gopforge.sh already supports --tools-dir,
+# so this is a GUI choice only; the CLI still defaults to ./tools.
+TOOLS_DIR="${HOME}/Library/Application Support/GopForge/tools"
+mkdir -p "$TOOLS_DIR" 2>/dev/null || true
+
+# runner: prefer the executable bit, fall back to `bash`; always pass --tools-dir
 run_gop() {
-  if [ -x "$GOP" ]; then "$GOP" "$@"; else bash "$GOP" "$@"; fi
+  if [ -x "$GOP" ]; then "$GOP" --tools-dir "$TOOLS_DIR" "$@"
+  else bash "$GOP" --tools-dir "$TOOLS_DIR" "$@"; fi
 }
 
 # ----------------------------------------------------------------------------
@@ -163,9 +171,15 @@ fi
 # FETCH
 # ----------------------------------------------------------------------------
 if [ "$MODE" = "FETCH" ]; then
-  echo "== Downloading EnableGop.ffs + DXEInject into ./tools =="
+  echo "== Downloading EnableGop.ffs + DXEInject into: $TOOLS_DIR =="
   if run_gop --fetch; then
-    msg "Dependencies downloaded into the tools/ folder." note
+    if [ "$(confirm "Dependencies downloaded to:
+
+$TOOLS_DIR
+
+Reveal this folder in Finder?" "Reveal")" = "Reveal" ]; then
+      open "$TOOLS_DIR" >/dev/null 2>&1 || true
+    fi
   else
     msg "Download failed — see the Terminal window." caution
   fi
