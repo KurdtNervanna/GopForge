@@ -55,38 +55,8 @@ elif [ -f "$HERE/AppIcon.png" ] && command -v sips >/dev/null 2>&1 && command -v
 fi
 [ -n "$ICNS" ] && echo "Icon: $ICNS" || echo "Icon: (generic — add AppIcon.png to brand it)"
 
-# ----------------------------------------------------------------------------
-# locate the Platypus CLI
-# ----------------------------------------------------------------------------
-PLAT="$(command -v platypus 2>/dev/null || true)"
-for p in /usr/local/bin/platypus /opt/homebrew/bin/platypus; do
-  [ -z "$PLAT" ] && [ -x "$p" ] && PLAT="$p"
-done
-
-rm -rf "$APP"
-
-if [ -n "$PLAT" ]; then
-  # ==========================================================================
-  # PREFERRED: Platypus "Text Window" app — status/log shown inside the app
-  # ==========================================================================
-  echo "Building with Platypus (in-app log window): $PLAT"
-  args=( -y -a "$APPNAME" -o "Text Window" -p "/bin/bash"
-         -V "$VERSION" -u "KurdtNervanna" -I "$BUNDLE_ID"
-         -f "$HERE/gopforge.sh" )
-  [ -n "$ICNS" ] && args+=( -i "$ICNS" )
-  # main script = the GUI front-end; its stdout streams into the app window
-  "$PLAT" "${args[@]}" "$HERE/gopforge-gui.command" "$APP"
-  MODE_NOTE="in-app log window (Platypus)"
-else
-  # ==========================================================================
-  # FALLBACK: plain .app whose launcher opens Terminal for the log
-  # ==========================================================================
-  echo "Platypus CLI not found — building the Terminal-log fallback app."
-  echo "  For the in-app log window (like Rom Dump), install Platypus (no Homebrew needed):"
-  echo "    1. Download it from https://sveinbjorn.org/platypus  and drag Platypus.app to /Applications"
-  echo "    2. Open Platypus → menu Platypus → Preferences → 'Install Command Line Tool'"
-  echo "    3. Re-run:  bash build-app.command"
-  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+# writes Contents/Info.plist for a hand-assembled bundle (Swift/Terminal builds)
+write_plist() {
   cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -106,6 +76,62 @@ else
 </dict>
 </plist>
 PLIST
+}
+
+# ----------------------------------------------------------------------------
+# detect toolchains: swiftc (preferred, native one-window app) then Platypus
+# ----------------------------------------------------------------------------
+SWIFTC="$(command -v swiftc 2>/dev/null || true)"
+[ -z "$SWIFTC" ] && SWIFTC="$(xcrun -f swiftc 2>/dev/null || true)"
+PLAT="$(command -v platypus 2>/dev/null || true)"
+for p in /usr/local/bin/platypus /opt/homebrew/bin/platypus "$HOME/bin/platypus"; do
+  [ -z "$PLAT" ] && [ -x "$p" ] && PLAT="$p"
+done
+echo "swiftc:   ${SWIFTC:-NOT FOUND}"
+echo "Platypus: ${PLAT:-NOT FOUND}"
+
+rm -rf "$APP"
+
+if [ -n "$SWIFTC" ] && [ -f "$HERE/GopForge.swift" ]; then
+  # ==========================================================================
+  # PREFERRED: native single-window AppKit app (buttons + colored log)
+  # ==========================================================================
+  echo "Building native Swift app…"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  write_plist
+  if "$SWIFTC" -O -o "$APP/Contents/MacOS/${APPNAME}" "$HERE/GopForge.swift" -framework AppKit; then
+    chmod +x "$APP/Contents/MacOS/${APPNAME}"
+    cp "$HERE/gopforge.sh" "$APP/Contents/Resources/gopforge.sh"; chmod +x "$APP/Contents/Resources/gopforge.sh"
+    [ -n "$ICNS" ] && cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
+    MODE_NOTE="native Swift app (one window, buttons, colored log)"
+  else
+    echo "swiftc failed — falling back."; rm -rf "$APP"; SWIFTC=""
+  fi
+fi
+
+if [ ! -d "$APP" ] && [ -n "$PLAT" ]; then
+  # ==========================================================================
+  # FALLBACK 1: Platypus "Text Window" app (in-app log, but no custom buttons)
+  # ==========================================================================
+  echo "Building with Platypus (in-app log window): $PLAT"
+  args=( -y -a "$APPNAME" -o "Text Window" -p "/bin/bash"
+         -V "$VERSION" -u "KurdtNervanna" -I "$BUNDLE_ID"
+         -f "$HERE/gopforge.sh" )
+  [ -n "$ICNS" ] && args+=( -i "$ICNS" )
+  "$PLAT" "${args[@]}" "$HERE/gopforge-gui.command" "$APP"
+  MODE_NOTE="Platypus text-window (log in-app; input via dialogs)"
+fi
+
+if [ ! -d "$APP" ]; then
+  # ==========================================================================
+  # FALLBACK 2: plain .app whose launcher opens Terminal for the log
+  # ==========================================================================
+  echo "No swiftc or Platypus — building the Terminal-log fallback app."
+  echo "  For the native one-window app, install Apple's Command Line Tools:"
+  echo "     xcode-select --install"
+  echo "  then re-run:  bash build-app.command"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  write_plist
   cat > "$APP/Contents/MacOS/${APPNAME}" <<'LAUNCH'
 #!/bin/bash
 RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
@@ -123,7 +149,7 @@ LAUNCH
   cp "$HERE/gopforge-gui.command" "$APP/Contents/Resources/gopforge-gui.command"
   chmod +x "$APP/Contents/Resources/gopforge.sh" "$APP/Contents/Resources/gopforge-gui.command"
   [ -n "$ICNS" ] && cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
-  MODE_NOTE="Terminal log (install Platypus for an in-app window)"
+  MODE_NOTE="Terminal log (install Xcode CLT for the native app)"
 fi
 
 # ----------------------------------------------------------------------------

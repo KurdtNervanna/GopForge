@@ -110,12 +110,15 @@ tools (`EnableGop.ffs`, `DXEInject`) are cached in
 bash build-app.command
 ```
 
-- If **Platypus's command-line tool** is installed, the app is built as a
-  Platypus *Text Window* app — the status/log is shown **inside the app window**,
-  like Rom Dump. Install Platypus once (no Homebrew needed): download it from
-  <https://sveinbjorn.org/platypus>, drag `Platypus.app` to `/Applications`, then
-  open Platypus → **Preferences → Install Command Line Tool**, and re-run.
-- Otherwise a plain `.app` is built whose launcher shows the log in **Terminal**.
+The builder picks the best UI your Mac can compile:
+
+- **Native app (preferred)** — a real one-window app: action buttons, a native
+  file picker, and a **colored, streaming log** in the same window. Needs Apple's
+  **Xcode Command Line Tools** (free, no Homebrew): `xcode-select --install`.
+- **Platypus** — if `swiftc` isn't available but the Platypus CLI is, builds a
+  Platypus *Text Window* app (log in-app; input via dialogs). Install Platypus
+  from <https://sveinbjorn.org/platypus> → **Preferences → Install Command Line Tool**.
+- **Terminal fallback** — otherwise a plain `.app` that shows the log in Terminal.
 
 Because the app is built locally it carries no Gatekeeper quarantine and
 double-clicks without a prompt.
