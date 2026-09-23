@@ -1,7 +1,14 @@
 # GopForge
 
-A guided shell tool that **injects the EnableGop DXE driver into a Mac Pro 4,1/5,1
+A guided tool that **injects the EnableGop DXE driver into a Mac Pro 4,1/5,1
 boot ROM and validates the result** — producing a ready-to-flash `.rom`.
+
+It comes in two forms that do exactly the same thing:
+
+- **GopForge.app** — a native macOS app (Select ROM → Inspect → Prepare), for
+  running right on the Mac Pro. Download it from **[Releases](../../releases)**.
+- **`gopforge.sh`** — the command-line tool the app is built on; runs on macOS or
+  Linux.
 
 It automates the fiddly, error-prone middle of the process. It does **not** dump
 your ROM and does **not** flash your hardware — those are done with
@@ -48,58 +55,42 @@ What this tool will *not* let you do accidentally:
 ```
    ┌─────────┐     ┌──────────────────────────┐     ┌──────────┐
    │  DUMP    │ ──▶ │  INJECT + VALIDATE        │ ──▶ │  FLASH   │
-   │ Rom Dump │     │  gopforge.sh (this)       │     │ Rom Dump │
+   │ Rom Dump │     │  GopForge (this)          │     │ Rom Dump │
    └─────────┘     └──────────────────────────┘     └──────────┘
      hardware            this repo                      hardware
 ```
 
 1. **Dump** your boot ROM with Rom Dump → `mymac.rom`
-2. **Prepare** it with this tool → `mymac-enablegop.rom`
-3. **Inspect** it in UEFITool 0.25.1 (serial + NVRAM intact, EnableGop present once)
+   (in the app, **Get Rom Dump** opens its download page)
+2. **Prepare** it with GopForge → `mymac-enablegop.rom`
+   (app: **Select ROM…** → **Prepare**; CLI: `./gopforge.sh --inject mymac.rom`)
+3. **Inspect** the result — GopForge's **Inspect** / `--check` first, then
+   UEFITool 0.25.1 (serial + NVRAM intact, EnableGop present once)
 4. **Flash** `mymac-enablegop.rom` with Rom Dump, let it verify
 5. **Reboot** with the GPU on DisplayPort/HDMI → native boot screen
 
 ---
 
-## Prerequisites
-
-| Thing | How the script gets it |
-| --- | --- |
-| **`EnableGop.ffs`** | **Auto-fetched** over HTTPS from the official OpenCorePkg release (`Utilities/EnableGop/EnableGop_<ver>.ffs`). It picks the standard, newest, non-dev `.ffs` — not the `EnableGopDirect` variant. Override the version with `--oc-version`, or supply your own with `-f`. |
-| **`DXEInject`** | **Auto-fetched** over HTTPS from `dosdude1.com/apps/DXEInject.zip` by default. It's a **dosdude1** tool, *not* part of OpenCore, and unsigned — so its SHA-256 is pinned on first fetch (trust-on-first-use) and a later change is refused. To use your own copy instead, drop it in `./tools/`, pass `--dxeinject <path>`, or override `--dxeinject-url`. |
-| **Macschrauber's Rom Dump** | For the actual dump and flash. Not called by this script — you run it yourself. |
-
-`bash`, `perl`, `cmp`, `awk`, plus `curl`/`wget` and `unzip` for fetching — all
-present by default on macOS and virtually every Linux.
-
-Grab the dependencies ahead of time if you like:
-
-```bash
-./gopforge.sh --fetch                                 # EnableGop.ffs + DXEInject
-./gopforge.sh --fetch --dxeinject-url https://…/DXEInject   # override the source
-```
-
-> Manual alternative to DXEInject: insert the `.ffs` into the DXE volume by hand
-> with **UEFITool 0.25.1** (newer UEFITool builds are read-only and can't write).
-> Then run `--check` on the result to confirm the driver landed.
-
-### How it knows EnableGop is present
-
-The driver stores no readable "EnableGop" string, so the tool detects it by its
-**FFS GUID** (`3FBA58B1-F8C0-41BC-ACD8-253043A3A17F`, stable across versions and
-the Direct variant). On `--inject` it reads the GUID from the exact `.ffs` you're
-injecting and confirms *that* GUID appears in the output — so validation tracks
-the real driver, not a guessed string.
-
----
-
-## GUI (macOS)
+## The app (macOS)
 
 If you'd rather not use the command line, GopForge has a native single-window
-app — buttons for *Select ROM / Inspect / Prepare / Download Tools*, a
-Standard/Direct selector, and a **colored, streaming log** in the same window. It
-**changes none of GopForge's logic**: it collects your choices and calls
-`gopforge.sh` with the matching flags. Downloaded tools (`EnableGop.ffs`,
+app — buttons for *Select ROM… / Inspect / Prepare / Download Tools / Get Rom
+Dump / Reveal Output*, a Standard/Direct selector, and a **colored, streaming log** in the same window. It
+**changes none of GopForge's logic**: it runs a bundled, unmodified copy of
+`gopforge.sh` with the matching flags, so everything in the
+[command-line](#usage-command-line) and [validation](#what-the-validation-checks)
+sections applies to the app too.
+
+| Button | Equivalent |
+| --- | --- |
+| **Select ROM…** | choose your dump (`.rom`/`.bin`) |
+| **Inspect** | `./gopforge.sh --check <rom>` |
+| **Prepare** | `./gopforge.sh --inject <rom>` (confirms first; writes `<rom>-enablegop.rom` + `.sha256`) |
+| **Standard / Direct** | default variant / `--direct` |
+| **Download Tools** | `./gopforge.sh --fetch` |
+| **Get Rom Dump** | opens Macschrauber's Rom Dump releases |
+| **Reveal Output** | shows the prepared ROM in Finder |
+ Downloaded tools (`EnableGop.ffs`,
 `DXEInject`) are cached in `~/Library/Application Support/GopForge/tools`. macOS only.
 
 | Inspect | Prepare |
@@ -134,6 +125,39 @@ double-clicks without a prompt.
 
 **No-build option:** you can also just **double-click `gopforge-gui.command`** —
 it runs the same GUI, with the log in a Terminal window.
+
+---
+
+## Prerequisites
+
+| Thing | How GopForge gets it |
+| --- | --- |
+| **`EnableGop.ffs`** | **Auto-fetched** over HTTPS from the official OpenCorePkg release (`Utilities/EnableGop/EnableGop_<ver>.ffs`). It picks the standard, newest, non-dev `.ffs` — not the `EnableGopDirect` variant. Override the version with `--oc-version`, or supply your own with `-f`. |
+| **`DXEInject`** | **Auto-fetched** over HTTPS from `dosdude1.com/apps/DXEInject.zip` by default. It's a **dosdude1** tool, *not* part of OpenCore, and unsigned — so its SHA-256 is pinned on first fetch (trust-on-first-use) and a later change is refused. To use your own copy instead, drop it in `./tools/`, pass `--dxeinject <path>`, or override `--dxeinject-url`. |
+| **Macschrauber's Rom Dump** | For the actual dump and flash. Not called by this script — you run it yourself. |
+
+`bash`, `perl`, `cmp`, `awk`, plus `curl`/`wget` and `unzip` for fetching — all
+present by default on macOS and virtually every Linux.
+
+Grab the dependencies ahead of time if you like — in the app click **Download
+Tools**, or from the command line:
+
+```bash
+./gopforge.sh --fetch                                 # EnableGop.ffs + DXEInject
+./gopforge.sh --fetch --dxeinject-url https://…/DXEInject   # override the source
+```
+
+> Manual alternative to DXEInject: insert the `.ffs` into the DXE volume by hand
+> with **UEFITool 0.25.1** (newer UEFITool builds are read-only and can't write).
+> Then run `--check` on the result to confirm the driver landed.
+
+### How it knows EnableGop is present
+
+The driver stores no readable "EnableGop" string, so the tool detects it by its
+**FFS GUID** (`3FBA58B1-F8C0-41BC-ACD8-253043A3A17F`, stable across versions and
+the Direct variant). On `--inject` it reads the GUID from the exact `.ffs` you're
+injecting and confirms *that* GUID appears in the output — so validation tracks
+the real driver, not a guessed string.
 
 ---
 
@@ -216,7 +240,8 @@ work through this:
 1. **Test with `BootKicker.efi`** (from the OpenCore release). Launch it and see
    whether the **native Apple boot picker** appears.
    - **Picker shows** → the card *can* do pre-boot graphics. If the standard
-     build gave nothing, re-inject with **`--direct`** (the `EnableGopDirect`
+     build gave nothing, re-inject with **Direct** selected in the app, or
+     **`--direct`** on the command line (the `EnableGopDirect`
      variant, for GPUs that need `DirectGopRendering`), then re-flash.
    - **Nothing shows** → the card has no usable GOP in its own option ROM. Main
      firmware alone can't fix this (next point).
@@ -228,7 +253,7 @@ work through this:
    README and the MacRumors *pre-OpenCore GOP* thread.
 3. **Check the display connection** — the boot screen appears on the port the GOP
    initializes; try **DisplayPort**, a single monitor, connected before power-on.
-4. **Confirm variant vs config** — use `EnableGopDirect` (`--direct`) when your
+4. **Confirm variant vs config** — use `EnableGopDirect` (**Direct** / `--direct`) when your
    OpenCore `UEFI/Output/DirectGopRendering` is `true`; the standard build
    otherwise (it renders faster).
 
@@ -245,7 +270,7 @@ refuses to inject into a ROM that already contains EnableGop).
 > also render. The ALT picker is the deliverable.
 >
 > *Confirmed working:* AMD **Vega 64** on a MacPro5,1 (4 MiB BootROM, 144.0.0.0.0)
-> with the **`--direct`** variant — native ⌥ boot picker on DisplayPort.
+> with the **Direct** variant (`--direct`) — native ⌥ boot picker on DisplayPort.
 
 ---
 
