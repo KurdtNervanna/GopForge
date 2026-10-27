@@ -69,6 +69,14 @@ What this tool will *not* let you do accidentally:
 4. **Flash** `mymac-enablegop.rom` with Rom Dump, let it verify
 5. **Reboot** with the GPU on DisplayPort/HDMI → native boot screen
 
+> **No working macOS on the Mac Pro?** [GopForge-Live](https://github.com/KurdtNervanna/GopForgeLive)
+> is a bootable USB stick or DVD that runs the whole pipeline without macOS: it dumps
+> the Boot ROM with `flashrom`, injects EnableGop with GopForge (through a Linux build
+> of the same injector, byte-identical output), and writes it back. It can also
+> crossflash a 4,1 to 5,1 firmware, and it flashes GOP firmware onto graphics cards in
+> 2009–2011 iMacs. Its flashing hasn't been proven on real hardware yet, so Rom Dump
+> remains the tested route.
+
 ---
 
 ## The app (macOS)
